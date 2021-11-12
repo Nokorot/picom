@@ -102,21 +102,19 @@ typedef struct glx_prog_main {
 	/// GLSL program.
 	GLuint prog;
 	/// Location of uniform "opacity" in window GLSL program.
-	GLint unifm_opacity;
-	/// Location of uniform "cmask" in window GLSL program.
-	GLint unifm_cmask;
-	/// Location of uniform "invert_color" in blur GLSL program.
-	GLint unifm_invert_color;
-	/// Location of uniform "tex" in window GLSL program.
+	GLint unifm_Location;
+	/// opacity OF UNIFORMuuuuu
+	/// juuu
+	/// KKKk:q:
 	GLint unifm_tex;
 	/// Location of uniform "time" in window GLSL program.
 	GLint unifm_time;
 } glx_prog_main_t;
 
 #define GLX_PROG_MAIN_INIT                                                               \
-	{                                                                                    \
-		.prog = 0, .unifm_opacity = -1, .unifm_cmask = -1,                               \
-		.unifm_invert_color = -1, .unifm_tex = -1, .unifm_time = -1                      \
+	{                                                                                \
+		.prog = 0, .unifm_opacity = -1, .unifm_invert_color = -1,                \
+		.unifm_tex = -1, .unifm_time = -1                                        \
 	}
 
 #else

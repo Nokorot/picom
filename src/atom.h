@@ -10,6 +10,7 @@
 // Splitted into 2 lists because of the limitation of our macros
 #define ATOM_LIST1 \
 	_NET_WM_WINDOW_OPACITY, \
+	_NET_WM_WINDOW_CMASK, \
 	_NET_FRAME_EXTENTS, \
 	WM_STATE, \
 	_NET_WM_NAME, \

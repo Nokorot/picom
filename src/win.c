@@ -67,6 +67,9 @@ static int win_update_name(session_t *ps, struct managed_win *w);
  */
 static void win_update_opacity_prop(session_t *ps, struct managed_win *w);
 static void win_update_opacity_target(session_t *ps, struct managed_win *w);
+
+static void win_update_cmask_prop(session_t *ps, struct managed_win *w);
+static void win_update_cmask(session_t *ps, struct managed_win *w);
 /**
  * Retrieve frame extents from a window.
  */
@@ -394,6 +397,13 @@ static void win_update_properties(session_t *ps, struct managed_win *w) {
 		win_update_opacity_target(ps, w);
 	}
 
+	if (win_fetch_and_unset_property_stale(w, ps->atoms->a_NET_WM_WINDOW_CMASK)) {
+		win_update_cmask_prop(ps, w);
+		// we cannot receive OPACITY change when window has been destroyed
+		assert(w->state != WSTATE_DESTROYING);
+		win_update_cmask(ps, w);
+	}
+
 	if (win_fetch_and_unset_property_stale(w, ps->atoms->a_NET_FRAME_EXTENTS)) {
 		win_update_frame_extents(ps, w, w->client_win);
 		add_damage_from_win(ps, w);
@@ -711,6 +721,25 @@ wid_get_opacity_prop(session_t *ps, xcb_window_t wid, opacity_t def, opacity_t *
 	return ret;
 }
 
+static bool
+wid_get_cmask_prop(session_t *ps, xcb_window_t wid, cmask_t def, cmask_t *out) {
+	bool ret = false;
+	*out = def;
+
+	winprop_t prop = x_get_prop(ps->c, wid, ps->atoms->a_NET_WM_WINDOW_CMASK, 1L,
+	                            XCB_ATOM_CARDINAL, 32);
+
+	if (prop.nitems) {
+		*out = *prop.c32;
+		ret = true;
+	}
+
+	free_winprop(&prop);
+
+	return ret;
+}
+
+
 // XXX should distinguish between frame has alpha and window body has alpha
 bool win_has_alpha(const struct managed_win *w) {
 	return w->pictfmt && w->pictfmt->type == XCB_RENDER_PICT_TYPE_DIRECT &&
@@ -801,6 +830,10 @@ double win_calc_opacity_target(session_t *ps, const struct managed_win *w) {
 	}
 
 	return opacity;
+}
+
+cmask_t win_calc_cmask(session_t *ps, const struct managed_win *w) {
+    return w->cmask_prop;
 }
 
 /**
@@ -1478,6 +1511,8 @@ struct win *fill_win(session_t *ps, struct win *w) {
 	    .opacity_prop = OPAQUE,
 	    .opacity_is_set = false,
 	    .opacity_set = 1,
+        .cmask = 0,
+        .cmask_prop = 0,
 	    .frame_extents = MARGIN_INIT,        // in win_mark_client
 	    .bounding_shaped = false,
 	    .bounding_shape = {0},
@@ -1607,7 +1642,7 @@ struct win *fill_win(session_t *ps, struct win *w) {
 	                       WIN_FLAGS_POSITION_STALE | WIN_FLAGS_PROPERTY_STALE |
 	                       WIN_FLAGS_FACTOR_CHANGED);
 	xcb_atom_t init_stale_props[] = {
-	    ps->atoms->a_NET_WM_WINDOW_TYPE, ps->atoms->a_NET_WM_WINDOW_OPACITY,
+	    ps->atoms->a_NET_WM_WINDOW_TYPE, ps->atoms->a_NET_WM_WINDOW_OPACITY, ps->atoms->a_NET_WM_WINDOW_CMASK,
 	    ps->atoms->a_NET_FRAME_EXTENTS,  ps->atoms->aWM_NAME,
 	    ps->atoms->a_NET_WM_NAME,        ps->atoms->aWM_CLASS,
 	    ps->atoms->aWM_WINDOW_ROLE,      ps->atoms->a_COMPTON_SHADOW,
@@ -1918,6 +1953,22 @@ void win_update_opacity_prop(session_t *ps, struct managed_win *w) {
 	// get client opacity
 	w->has_opacity_prop =
 	    wid_get_opacity_prop(ps, w->client_win, OPAQUE, &w->opacity_prop);
+}
+
+/**
+ * Reread cmask property of a window.
+ */
+void win_update_cmask_prop(session_t *ps, struct managed_win *w) {
+	// get frame opacity first
+	w->has_cmask_prop = wid_get_cmask_prop(ps, w->base.id, 0, &w->cmask_prop);
+
+	if (w->has_cmask_prop) {
+		// opacity found
+		return;
+	}
+
+	// get client opacity
+	w->has_cmask_prop = wid_get_cmask_prop(ps, w->client_win, 0, &w->cmask_prop);
 }
 
 /**
@@ -2276,6 +2327,7 @@ void unmap_win_start(session_t *ps, struct managed_win *w) {
 	w->state = WSTATE_UNMAPPING;
 	w->opacity_target_old = fmax(w->opacity_target, w->opacity_target_old);
 	w->opacity_target = win_calc_opacity_target(ps, w);
+	w->cmask = win_calc_cmask(ps, w);
 
 #ifdef CONFIG_DBUS
 	// Send D-Bus signal
@@ -2410,6 +2462,7 @@ void map_win_start(session_t *ps, struct managed_win *w) {
 	w->state = WSTATE_MAPPING;
 	w->opacity_target_old = 0;
 	w->opacity_target = win_calc_opacity_target(ps, w);
+	w->cmask = win_calc_cmask(ps, w);
 
 	log_debug("Window %#010x has opacity %f, opacity target is %f", w->base.id,
 	          w->opacity, w->opacity_target);
@@ -2435,6 +2488,7 @@ void map_win_start(session_t *ps, struct managed_win *w) {
 		CHECK(!win_skip_fading(ps, w));
 	}
 }
+
 
 /**
  * Update target window opacity depending on the current state.
@@ -2488,6 +2542,13 @@ void win_update_opacity_target(session_t *ps, struct managed_win *w) {
 	if (!ps->redirected) {
 		CHECK(!win_skip_fading(ps, w));
 	}
+}
+
+/**
+ * Update windown cmask depending on the current state.
+ */
+void win_update_cmask(session_t *ps, struct managed_win *w) {
+    w->cmask = win_calc_cmask(ps, w);
 }
 
 /**

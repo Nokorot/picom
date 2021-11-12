@@ -386,6 +386,9 @@ static void _gl_compose(backend_t *base, struct backend_image *img, GLuint targe
 	if (gd->win_shader.unifm_opacity >= 0) {
 		glUniform1f(gd->win_shader.unifm_opacity, (float)img->opacity);
 	}
+	// if (gd->win_shader.unifm_cmask >= 0) {
+	// 	glUniform1f(gd->win_shader.unifm_cmask, (float) 1, (float) 1, (float) 0, (float) 1);
+	// }
 	if (gd->win_shader.unifm_invert_color >= 0) {
 		glUniform1i(gd->win_shader.unifm_invert_color, img->color_inverted);
 	}

@@ -218,6 +218,10 @@ struct managed_win {
 	/// Last window opacity value set by the rules.
 	double opacity_set;
 
+    cmask_t cmask;
+	bool has_cmask_prop;
+	cmask_t cmask_prop;
+
 	/// Radius of rounded window corners
 	int corner_radius;
 	float border_col[4];

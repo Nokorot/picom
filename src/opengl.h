@@ -93,7 +93,7 @@ bool glx_dim_dst(session_t *ps, int dx, int dy, int width, int height, int z,
                  GLfloat factor, const region_t *reg_tgt);
 
 bool glx_render(session_t *ps, const glx_texture_t *ptex, int x, int y, int dx, int dy,
-                int width, int height, int z, double opacity, bool argb, bool neg,
+                int width, int height, int z, double opacity, cmask_t cmask, bool argb, bool neg,
                 const region_t *reg_tgt, const glx_prog_main_t *pprogram);
 
 bool glx_init(session_t *ps, bool need_render);

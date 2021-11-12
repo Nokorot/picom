@@ -505,6 +505,14 @@ static inline void ev_property_notify(session_t *ps, xcb_property_notify_event_t
 		}
 	}
 
+	// If _NET_WM_CMASK changes
+	if (ev->atom == ps->atoms->a_NET_WM_WINDOW_CMASK) {
+		auto w = find_managed_win(ps, ev->window) ?: find_toplevel(ps, ev->window);
+		if (w) {
+			win_set_property_stale(w, ev->atom);
+		}
+	}
+
 	// If frame extents property changes
 	if (ev->atom == ps->atoms->a_NET_FRAME_EXTENTS) {
 		auto w = find_toplevel(ps, ev->window);

@@ -223,6 +223,7 @@ static void glx_free_prog_main(glx_prog_main_t *pprogram) {
 		pprogram->prog = 0;
 	}
 	pprogram->unifm_opacity = -1;
+	pprogram->unifm_cmask = -1;
 	pprogram->unifm_invert_color = -1;
 	pprogram->unifm_tex = -1;
 }
@@ -593,6 +594,7 @@ bool glx_load_prog_main(const char *vshader_str, const char *fshader_str,
 		}                                                                        \
 	}
 	P_GET_UNIFM_LOC("opacity", unifm_opacity);
+	P_GET_UNIFM_LOC("cmask",   unifm_cmask);
 	P_GET_UNIFM_LOC("invert_color", unifm_invert_color);
 	P_GET_UNIFM_LOC("tex", unifm_tex);
 	P_GET_UNIFM_LOC("time", unifm_time);
@@ -1303,7 +1305,7 @@ bool glx_dim_dst(session_t *ps, int dx, int dy, int width, int height, int z,
  * @brief Render a region with texture data.
  */
 bool glx_render(session_t *ps, const glx_texture_t *ptex, int x, int y, int dx, int dy,
-                int width, int height, int z, double opacity, bool argb, bool neg,
+                int width, int height, int z, double opacity, cmask_t cmask, bool argb, bool neg,
                 const region_t *reg_tgt, const glx_prog_main_t *pprogram) {
 	if (!ptex || !ptex->texture) {
 		log_error("Missing texture.");
@@ -1413,6 +1415,13 @@ bool glx_render(session_t *ps, const glx_texture_t *ptex, int x, int y, int dx, 
 		clock_gettime(CLOCK_MONOTONIC, &ts);
 		if (pprogram->unifm_opacity >= 0)
 			glUniform1f(pprogram->unifm_opacity, (float)opacity);
+		if (pprogram->unifm_cmask >= 0)
+            // We interpret 0 as no cmask
+			glUniform4f(pprogram->unifm_cmask,
+                    (float) ((cmask >> 24) & 0xff) / 0xff,
+                    (float) ((cmask >> 16) & 0xff) / 0xff,
+                    (float) ((cmask >>  8) & 0xff) / 0xff,
+                    (float) ((cmask >>  0) & 0xff) / 0xff);
 		if (pprogram->unifm_invert_color >= 0)
 			glUniform1i(pprogram->unifm_invert_color, neg);
 		if (pprogram->unifm_tex >= 0)

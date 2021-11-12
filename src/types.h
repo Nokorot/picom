@@ -27,6 +27,7 @@ struct color {
 };
 
 typedef uint32_t opacity_t;
+typedef uint32_t cmask_t;
 
 #define MARGIN_INIT                                                                      \
 	{ 0, 0, 0, 0 }

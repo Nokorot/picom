@@ -242,7 +242,7 @@ uint32_t make_rounded_window_shape(xcb_render_trapezoid_t traps[], uint32_t max_
 }
 
 void render(session_t *ps, int x, int y, int dx, int dy, int wid, int hei, int fullwid,
-            int fullhei, double opacity, bool argb, bool neg, int cr,
+            int fullhei, double opacity, cmask_t cmask, bool argb, bool neg, int cr,
             xcb_render_picture_t pict, glx_texture_t *ptex, const region_t *reg_paint,
             const glx_prog_main_t *pprogram, clip_t *clip) {
 	switch (ps->o.backend) {
@@ -332,7 +332,7 @@ void render(session_t *ps, int x, int y, int dx, int dy, int wid, int hei, int f
 	}
 #ifdef CONFIG_OPENGL
 	case BKEND_GLX:
-		glx_render(ps, ptex, x, y, dx, dy, wid, hei, ps->psglx->z, opacity, argb,
+		glx_render(ps, ptex, x, y, dx, dy, wid, hei, ps->psglx->z, opacity, cmask, argb,
 		           neg, reg_paint, pprogram);
 		ps->psglx->z += 1;
 		break;
@@ -349,7 +349,7 @@ void render(session_t *ps, int x, int y, int dx, int dy, int wid, int hei, int f
 
 static inline void
 paint_region(session_t *ps, const struct managed_win *w, int x, int y, int wid, int hei,
-             double opacity, const region_t *reg_paint, xcb_render_picture_t pict) {
+             double opacity, cmask_t cmask, const region_t *reg_paint, xcb_render_picture_t pict) {
 	const int dx = (w ? w->g.x : 0) + x;
 	const int dy = (w ? w->g.y : 0) + y;
 	const int fullwid = w ? w->widthb : 0;
@@ -357,7 +357,7 @@ paint_region(session_t *ps, const struct managed_win *w, int x, int y, int wid, 
 	const bool argb = (w && (win_has_alpha(w) || ps->o.force_win_blend));
 	const bool neg = (w && w->invert_color);
 
-	render(ps, x, y, dx, dy, wid, hei, fullwid, fullhei, opacity, argb, neg,
+	render(ps, x, y, dx, dy, wid, hei, fullwid, fullhei, opacity, cmask, argb, neg,
 	       w ? w->corner_radius : 0, pict,
 	       (w ? w->paint.ptex : ps->root_tile_paint.ptex), reg_paint,
 #ifdef CONFIG_OPENGL
@@ -472,7 +472,7 @@ void paint_one(session_t *ps, struct managed_win *w, const region_t *reg_paint) 
 	}
 
 	if (w->frame_opacity == 1) {
-		paint_region(ps, w, 0, 0, wid, hei, w->opacity, reg_paint, pict);
+		paint_region(ps, w, 0, 0, wid, hei, w->opacity, w->cmask, reg_paint, pict);
 	} else {
 		// Painting parameters
 		const margin_t extents = win_calc_frame_extents(w);
@@ -483,7 +483,7 @@ void paint_one(session_t *ps, struct managed_win *w, const region_t *reg_paint) 
 
 #define COMP_BDR(cx, cy, cwid, chei)                                                     \
 	paint_region(ps, w, (cx), (cy), (cwid), (chei), w->frame_opacity * w->opacity,   \
-	             reg_paint, pict)
+	             w->cmask, reg_paint, pict)
 
 		// Sanitize the margins, in case some broken WM makes
 		// top_width + bottom_width > height in some cases.
@@ -534,7 +534,7 @@ void paint_one(session_t *ps, struct managed_win *w, const region_t *reg_paint) 
 
 			// body
 			paint_region(ps, w, cleft, ctop, body_width, body_height,
-			             w->opacity, reg_paint, pict);
+			             w->opacity, w->cmask, reg_paint, pict);
 		} while (0);
 	}
 
@@ -652,7 +652,7 @@ static void paint_root(session_t *ps, const region_t *reg_paint) {
 	if (!ps->root_tile_paint.pixmap && !get_root_tile(ps))
 		return;
 
-	paint_region(ps, NULL, 0, 0, ps->root_width, ps->root_height, 1.0, reg_paint,
+	paint_region(ps, NULL, 0, 0, ps->root_width, ps->root_height, 1.0, 0, reg_paint,
 	             ps->root_tile_paint.pict);
 }
 
@@ -781,7 +781,7 @@ win_paint_shadow(session_t *ps, struct managed_win *w, region_t *reg_paint) {
 	    .y = -(w->shadow_dy),
 	};
 	render(ps, 0, 0, w->g.x + w->shadow_dx, w->g.y + w->shadow_dy, w->shadow_width,
-	       w->shadow_height, w->widthb, w->heightb, w->shadow_opacity, true, false, 0,
+	       w->shadow_height, w->widthb, w->heightb, w->shadow_opacity, 0, true, false, 0,
 	       w->shadow_paint.pict, w->shadow_paint.ptex, reg_paint, NULL,
 	       should_clip ? &clip : NULL);
 	if (td) {
@@ -1266,7 +1266,7 @@ void paint_all(session_t *ps, struct managed_win *t, bool ignore_damage) {
 			glFlush();
 		glXWaitX();
 		glx_render(ps, ps->tgt_buffer.ptex, 0, 0, 0, 0, ps->root_width,
-		           ps->root_height, 0, 1.0, false, false, &region, NULL);
+		           ps->root_height, 0, 1.0, 0, false, false, &region, NULL);
 		fallthrough();
 	case BKEND_GLX: glXSwapBuffers(ps->dpy, get_tgt_window(ps)); break;
 #endif
