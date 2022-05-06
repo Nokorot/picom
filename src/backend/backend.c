@@ -44,7 +44,7 @@ region_t get_damage(session_t *ps, bool all_damage) {
 	} else {
 		for (int i = 0; i < buffer_age; i++) {
 			auto curr = ((ps->damage - ps->damage_ring) + i) % ps->ndamage;
-			log_trace("damage index: %d, damage ring offset: %ld", i, curr);
+			log_trace("damage index: %d, damage ring offset: %td", i, curr);
 			dump_region(&ps->damage_ring[curr]);
 			pixman_region32_union(&region, &region, &ps->damage_ring[curr]);
 		}
@@ -53,8 +53,37 @@ region_t get_damage(session_t *ps, bool all_damage) {
 	return region;
 }
 
+void handle_device_reset(session_t *ps) {
+	log_error("Device reset detected");
+	// Wait for reset to complete
+	// Although ideally the backend should return DEVICE_STATUS_NORMAL after a reset
+	// is completed, it's not always possible.
+	//
+	// According to ARB_robustness (emphasis mine):
+	//
+	//     "If a reset status other than NO_ERROR is returned and subsequent
+	//     calls return NO_ERROR, the context reset was encountered and
+	//     completed. If a reset status is repeatedly returned, the context **may**
+	//     be in the process of resetting."
+	//
+	//  Which means it may also not be in the process of resetting. For example on
+	//  AMDGPU devices, Mesa OpenGL always return CONTEXT_RESET after a reset has
+	//  started, completed or not.
+	//
+	//  So here we blindly wait 5 seconds and hope ourselves best of the luck.
+	sleep(5);
+
+	// Reset picom
+	log_info("Resetting picom after device reset");
+	ev_break(ps->loop, EVBREAK_ALL);
+}
+
 /// paint all windows
 void paint_all_new(session_t *ps, struct managed_win *t, bool ignore_damage) {
+	if (ps->backend_data->ops->device_status &&
+	    ps->backend_data->ops->device_status(ps->backend_data) != DEVICE_STATUS_NORMAL) {
+		return handle_device_reset(ps);
+	}
 	if (ps->o.xrender_sync_fence) {
 		if (ps->xsync_exists && !x_fence_sync(ps->c, ps->sync_fence)) {
 			log_error("x_fence_sync failed, xrender-sync-fence will be "
@@ -339,6 +368,21 @@ void paint_all_new(session_t *ps, struct managed_win *t, bool ignore_damage) {
 			    &dim_opacity);
 			ps->backend_data->ops->set_image_property(
 			    ps->backend_data, IMAGE_PROPERTY_OPACITY, w->win_image, &w->opacity);
+			ps->backend_data->ops->set_image_property(
+			    ps->backend_data, IMAGE_PROPERTY_CORNER_RADIUS, w->win_image,
+			    (double[]){w->corner_radius});
+			if (w->corner_radius) {
+				int border_width = w->g.border_width;
+				if (border_width == 0) {
+					// Some WM has borders implemented as WM frames
+					border_width = min3(w->frame_extents.left,
+					                    w->frame_extents.right,
+					                    w->frame_extents.bottom);
+				}
+				ps->backend_data->ops->set_image_property(
+				    ps->backend_data, IMAGE_PROPERTY_BORDER_WIDTH,
+				    w->win_image, &border_width);
+			}
 		}
 
 		if (w->opacity * MAX_ALPHA < 1) {

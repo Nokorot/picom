@@ -92,7 +92,7 @@ make_shadow(xcb_connection_t *c, const conv *kernel, double opacity, int width, 
 	}
 
 	unsigned char *data = ximage->data;
-	long sstride = ximage->stride;
+	long long sstride = ximage->stride;
 
 	// If the window body is smaller than the kernel, we do convolution directly
 	if (width < r * 2 && height < r * 2) {
@@ -449,7 +449,9 @@ bool default_set_image_property(backend_t *base attr_unused, enum image_properti
 		tex->ewidth = iargs[0];
 		tex->eheight = iargs[1];
 		break;
+	case IMAGE_PROPERTY_CORNER_RADIUS: tex->corner_radius = dargs[0]; break;
 	case IMAGE_PROPERTY_MAX_BRIGHTNESS: tex->max_brightness = dargs[0]; break;
+	case IMAGE_PROPERTY_BORDER_WIDTH: tex->border_width = *(int *)arg; break;
 	}
 
 	return true;
@@ -468,6 +470,7 @@ struct backend_image *default_new_backend_image(int w, int h) {
 	ret->eheight = h;
 	ret->ewidth = w;
 	ret->color_inverted = false;
+	ret->corner_radius = 0;
 	return ret;
 }
 
