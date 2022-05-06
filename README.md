@@ -103,6 +103,12 @@ On Fedora, the needed packages are
 dbus-devel gcc git libconfig-devel libdrm-devel libev-devel libX11-devel libX11-xcb libXext-devel libxcb-devel mesa-libGL-devel meson pcre-devel pixman-devel uthash-devel xcb-util-image-devel xcb-util-renderutil-devel xorg-x11-proto-devel
 ```
 
+On Arch,
+
+```
+git gcc cmake libx11 libxcb libxext xorgproto libconfig libev pixman uthash
+```
+
 To build the documents, you need `asciidoc`
 
 ### To build
